@@ -49,8 +49,8 @@
       this.scene = new THREE.Scene();
 
       // 相机 透视相机
-      this.camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-      this.camera.position.set(0, -70, 150);
+      this.camera = new THREE.PerspectiveCamera(5, window.innerWidth / window.innerHeight, 0.1, 1000);
+      this.camera.position.set(0, 0, 50);
       this.camera.lookAt(0, 0, 0);
 
       this.setController(); // 设置控制
@@ -80,7 +80,7 @@
 
       // 加载json文件
       let loader = new THREE.FileLoader();
-      loader.load('./json/china.json', function (data) {
+      loader.load('./json/beijing.json', function (data) {
         let jsonData = JSON.parse(data);
         _this.initMap(jsonData);
       });
@@ -109,78 +109,88 @@
       this.scene.add(textMesh);
     }
 
-    initMap(chinaJson) {
+    initMap(beijingJson) {
       // 建一个空对象存放对象
       this.map = new THREE.Object3D();
 
       let _this = this;
 
+
+      // 每个的 坐标 数组
+      const coordinates = beijingJson.geometry.coordinates;
+
+      let xSum = 0;
+      let ySum = 0;
+      coordinates.forEach(([x, y]) => {
+        xSum += Number(x);
+        ySum += Number(y);
+      })
+      console.log(xSum, ySum);
       // 墨卡托投影转换
-      const projection = d3.geoMercator().center([104.0, 37.5]).scale(80).translate([0, 0]);
+      const projection = d3.geoMercator().center([xSum / coordinates.length, ySum / coordinates.length]).scale(60).translate([0, 0]);
 
-      chinaJson.features.forEach(elem => {
-        // 定一个省份3D对象
-        const province = new THREE.Object3D();
-        // 每个的 坐标 数组
-        const coordinates = elem.geometry.coordinates;
-        // 循环坐标数组
-        coordinates.forEach(multiPolygon => {
+      // 定一个省份3D对象
+      const province = new THREE.Object3D();
 
-          multiPolygon.forEach(polygon => {
-            const shape = new THREE.Shape();
-            const lineMaterial = new THREE.LineBasicMaterial({
-              color: 'white'
-            });
-            const lineGeometry = new THREE.Geometry();
+      // 循环坐标数组
+      coordinates.forEach(multiPolygon => {
 
-            for (let i = 0; i < polygon.length; i++) {
-              const [x, y] = projection(polygon[i]);
-              if (i === 0) {
-                shape.moveTo(x, -y);
-              }
-              shape.lineTo(x, -y);
-              lineGeometry.vertices.push(new THREE.Vector3(x, -y, 4.01));
+        multiPolygon.forEach(polygon => {
+          const shape = new THREE.Shape();
+          const lineMaterial = new THREE.LineBasicMaterial({
+            color: 'white'
+          });
+          const lineGeometry = new THREE.Geometry();
+
+          for (let i = 0; i < polygon.length; i++) {
+            let [x, y] = projection(polygon[i]);
+            // x = x ;
+            // y = y / 8;
+            if (i === 0) {
+              shape.moveTo(x, -y);
             }
+            shape.lineTo(x, -y);
+            lineGeometry.vertices.push(new THREE.Vector3(x, -y, 4.01));
+          }
 
-            const extrudeSettings = {
-              depth: 4,
-              bevelEnabled: false
-            };
+          const extrudeSettings = {
+            depth: 4,
+            bevelEnabled: false
+          };
 
-            const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
-            const material = new THREE.MeshBasicMaterial({
-              color: '#02A1E2',
-              transparent: true,
-              opacity: 0.6
-            });
-            const material1 = new THREE.MeshBasicMaterial({
-              color: '#3480C4',
-              transparent: true,
-              opacity: 0.5
-            });
-            /* const material = new THREE.MeshBasicMaterial({ color: '#dedede', transparent: false, opacity: 0.6 });
-            const material1 = new THREE.MeshBasicMaterial({ color: '#dedede', transparent: false, opacity: 0.5 }); */
-            const mesh = new THREE.Mesh(geometry, [material, material1]);
-            const line = new THREE.Line(lineGeometry, lineMaterial);
-            province.add(mesh);
-            province.add(line)
-
-          })
+          const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+          const material = new THREE.MeshBasicMaterial({
+            color: '#02A1E2',
+            transparent: true,
+            opacity: 0.6
+          });
+          const material1 = new THREE.MeshBasicMaterial({
+            color: '#3480C4',
+            transparent: true,
+            opacity: 0.5
+          });
+          /* const material = new THREE.MeshBasicMaterial({ color: '#dedede', transparent: false, opacity: 0.6 });
+          const material1 = new THREE.MeshBasicMaterial({ color: '#dedede', transparent: false, opacity: 0.5 }); */
+          const mesh = new THREE.Mesh(geometry, [material, material1]);
+          const line = new THREE.Line(lineGeometry, lineMaterial);
+          province.add(mesh);
+          province.add(line)
 
         })
 
-        // 将geo的属性放到省份模型中
-        province.properties = elem.properties;
-        if (elem.properties.contorid) {
-          const [x, y] = projection(elem.properties.contorid);
-          province.properties._centroid = [x, y];
-        }
-
-        _this.map.add(province);
-
       })
 
+      // 将geo的属性放到省份模型中
+      province.properties = beijingJson.properties;
+      if (beijingJson.properties.contorid) {
+        const [x, y] = projection(beijingJson.properties.contorid);
+        province.properties._centroid = [x, y];
+      }
+
+      _this.map.add(province);
+
       this.scene.add(this.map);
+      this.scene.add(new THREE.AxesHelper(50));
     }
 
     setRaycaster() {
